@@ -21,7 +21,8 @@ export default function LightBulb({
   position = [0, 0, 30],  // Camera position
   gravity = [0, -40, 0],  // Gravity direction and strength
   fov = 20,               // Field of view for camera
-  transparent = true      // Whether background is transparent
+  transparent = true,
+  theme      // Whether background is transparent
 }) {
   return (
     <div className="relative z-0 w-full h-full flex justify-center items-center transform scale-100 origin-center">
@@ -32,7 +33,8 @@ export default function LightBulb({
       >
         <ambientLight intensity={Math.PI} />
         <Physics gravity={gravity} timeStep={1 / 60}>
-          <Wire /> {/* This is where the light bulb and wire are created */}
+          <Wire 
+          theme={theme}/> {/* This is where the light bulb and wire are created */}
         </Physics>
         {/* SECTION 3: LIGHTING SETUP */}
         <Environment blur={0.75}>
@@ -47,7 +49,7 @@ export default function LightBulb({
 }
 
 // SECTION 4: WIRE AND BULB COMPONENT
-function Wire({ maxSpeed = 50, minSpeed = 0 }) {
+function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
   // References to different parts of the physics setup
   const wire = useRef();       // Reference to the wire mesh
   const fixed = useRef();      // Fixed anchor point at the top
@@ -61,6 +63,8 @@ function Wire({ maxSpeed = 50, minSpeed = 0 }) {
   const ang = new THREE.Vector3();
   const rot = new THREE.Vector3();
   const dir = new THREE.Vector3();
+
+  const [isOn ,setIsOn] = useState(false)
   
   // Physics properties for segments
   const segmentProps = { 
@@ -223,6 +227,8 @@ function Wire({ maxSpeed = 50, minSpeed = 0 }) {
             onPointerDown={(e) => {
               e.target.setPointerCapture(e.pointerId);
               drag(new THREE.Vector3().copy(e.point).sub(vec.copy(bulb.current.translation())));
+              theme(!isOn)
+              setIsOn(!isOn)
             }}
           >
             {/* REPLACE THIS SECTION with your light bulb model parts */}
@@ -235,7 +241,15 @@ function Wire({ maxSpeed = 50, minSpeed = 0 }) {
                 <mesh 
                   key={nodeName}
                   geometry={nodes[nodeName].geometry} 
-                  material={nodes[nodeName].material || materials[nodeName]}
+                  material={!isOn?
+                    nodes[nodeName].material || materials[nodeName]:
+                    new THREE.MeshStandardMaterial({
+                    color: 'yellow',
+                    emissive: new THREE.Color('yellow'),
+                    emissiveIntensity: 2 ,
+                  })
+                  }
+                  
                 />
               );
             })}
