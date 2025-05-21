@@ -223,12 +223,13 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
             onPointerUp={(e) => {
               e.target.releasePointerCapture(e.pointerId);
               drag(false);
+              theme(!isOn)
+              setIsOn(!isOn)
             }}
             onPointerDown={(e) => {
               e.target.setPointerCapture(e.pointerId);
               drag(new THREE.Vector3().copy(e.point).sub(vec.copy(bulb.current.translation())));
-              theme(!isOn)
-              setIsOn(!isOn)
+              
             }}
           >
             {/* REPLACE THIS SECTION with your light bulb model parts */}
@@ -238,19 +239,22 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
               if (!nodes[nodeName].geometry) return null;
               
               return (
+                <>
+                {console.log(nodeName)}
                 <mesh 
                   key={nodeName}
                   geometry={nodes[nodeName].geometry} 
-                  material={!isOn?
+                  material={!isOn || nodeName!="Object_4"?
                     nodes[nodeName].material || materials[nodeName]:
                     new THREE.MeshStandardMaterial({
-                    color: 'yellow',
-                    emissive: new THREE.Color('yellow'),
+                    color: 'red',
+                    emissive: new THREE.Color('orange'),
                     emissiveIntensity: 2 ,
                   })
                   }
                   
                 />
+                </>
               );
             })}
             
