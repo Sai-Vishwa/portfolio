@@ -9,12 +9,24 @@ function App() {
   const [theme , setTheme ] = useState(false)
 
   return (
-    <div className={`w-screen h-screen  ${!theme?'bg-blue-900 ':'bg-blue-900 '} ${!theme?'text-blue-900':'text-blue-200'}  text-6xl flex justify-center items-center`}>
-        <p>
-          Hey Check this out !!!
-        </p>
+    <div className={`max-w-screen h-[120vh] overflow-x-hidden ${!theme?'bg-[#0a0025] ':'bg-[#ffffff] '} ${!theme?'text-[#66ff6e]':'text-[#ff0000]'}  text-6xl flex`}>
         <LightBulb 
         theme={setTheme}/>
+        <div className='w-3/4 flex items-center justify-start'>
+
+        <p> 
+          Hey inga paaru
+        </p>
+
+        </div>
+        <div className='w-1/4 '>
+
+          
+
+        </div>
+          
+        
+        
     </div>
   )
 }

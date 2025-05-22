@@ -17,28 +17,33 @@ extend({ MeshLineGeometry, MeshLineMaterial });
 // SECTION 2: MAIN COMPONENT
 // This is the container component that sets up the canvas and physics environment
 export default function LightBulb({ 
-  position = [0, 0 , 30],  // Camera position
+  position = [0, 0, 30],  // Camera position
   gravity = [0, -40, 0],  // Gravity direction and strength
   fov = 20,               // Field of view for camera
   transparent = true,
-  theme,      // Whether background is transparent
-  width = 300,            // Width of the component
-  height = 400            // Height of the component
+  theme      // Whether background is transparent
 }) {
   return (
-    <div 
-      className="fixed top-0 right-0 z-50 transform translate-x-1/3 -translate-y-1/6 scale-100"
-      style={{ 
-        width: `${width}px`, 
-        height: `${height}px`
-      }}
-    >
+    <div className="relative z-0 w-full h-full flex justify-center items-center transform scale-100 origin-center">
       <Canvas
         camera={{ position: position, fov: fov }}
         gl={{ alpha: transparent }}
         onCreated={({ gl }) => gl.setClearColor(new THREE.Color(0x000000), transparent ? 0 : 1)}
+        shadows // Enable shadows in the canvas
       >
-        <ambientLight intensity={Math.PI} />
+        <ambientLight intensity={Math.PI / 4} /> {/* Reduced ambient light for better shadows */}
+        <directionalLight 
+          position={[10, 10, 5]} 
+          intensity={2} 
+          castShadow 
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+          shadow-camera-far={50}
+          shadow-camera-left={-10}
+          shadow-camera-right={10}
+          shadow-camera-top={10}
+          shadow-camera-bottom={-10}
+        />
         <Physics gravity={gravity} timeStep={1 / 60}>
           <Wire 
           theme={theme}/> {/* This is where the light bulb and wire are created */}
@@ -105,16 +110,28 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
     typeof window !== 'undefined' && window.innerWidth < 1024
   );
 
-  // SECTION 5.5: DRAG CONSTRAINTS
-  // Define the maximum downward distance the bulb can be dragged
-  const MAX_DRAG_DISTANCE = 6; // Adjust this value to control how far down the bulb can be pulled
-  const fixedAnchorPosition = new THREE.Vector3(0, 4, 0); // Position of the fixed anchor
+  // SECTION 5.5: POSITIONING AND STRING LENGTH CONTROLS
+  // BULB INITIAL POSITION - Change these values to position your bulb
+  const BULB_INITIAL_X = 2;     // Horizontal position (left-right)
+  const BULB_INITIAL_Y = 0;     // Vertical position (up-down) 
+  const BULB_INITIAL_Z = 0;     // Depth position (forward-back)
+  
+  // STRING LENGTH CONTROLS
+  const STRING_SEGMENT_LENGTH = 1;      // Distance between each joint (controls total string length)
+  const MAX_DRAG_DISTANCE = 4;         // How far down the bulb can be pulled
+  const TOTAL_STRING_LENGTH = STRING_SEGMENT_LENGTH * 3; // Total length when hanging straight
+  
+  // ANCHOR POSITION - Where the string attaches at the top
+  const ANCHOR_X = 0;           // Anchor horizontal position
+  const ANCHOR_Y = 4;           // Anchor height position  
+  const ANCHOR_Z = 0;           // Anchor depth position
+  const fixedAnchorPosition = new THREE.Vector3(ANCHOR_X, ANCHOR_Y, ANCHOR_Z);
 
   // SECTION 6: PHYSICS JOINTS SETUP
-  // Setup rope joints between physics bodies
-  useRopeJoint(fixed, j1, [[0, 0, 0], [0, 0, 0], 0.35]);  // Connect fixed point to j1
-  useRopeJoint(j1, j2, [[0, 0, 0], [0, 0, 0], 0.35]);     // Connect j1 to j2
-  useRopeJoint(j2, j3, [[0, 0, 0], [0, 0, 0], 0.35]);     // Connect j2 to j3
+  // Setup rope joints between physics bodies - STRING_SEGMENT_LENGTH controls the distance
+  useRopeJoint(fixed, j1, [[0, 0, 0], [0, 0, 0], STRING_SEGMENT_LENGTH]);  
+  useRopeJoint(j1, j2, [[0, 0, 0], [0, 0, 0], STRING_SEGMENT_LENGTH]);     
+  useRopeJoint(j2, j3, [[0, 0, 0], [0, 0, 0], STRING_SEGMENT_LENGTH]);     
   useSphericalJoint(j3, bulb, [[0, 0, 0], [0, 1.50, 0]]); // Connect j3 to the bulb
 
   // SECTION 7: CURSOR EFFECTS
@@ -209,28 +226,28 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
   return (
     <>
       {/* SECTION 10: PHYSICS BODIES SETUP */}
-      <group position={[0, 4 , 0]}>
+      <group position={[ANCHOR_X, ANCHOR_Y, ANCHOR_Z]}>
         {/* Fixed anchor point */}
         <RigidBody ref={fixed} {...segmentProps} type="fixed" />
         
-        {/* Joint 1 */}
-        <RigidBody position={[0.5, 0, 0]} ref={j1} {...segmentProps}>
+        {/* Joint 1 - Position based on STRING_SEGMENT_LENGTH */}
+        <RigidBody position={[STRING_SEGMENT_LENGTH * 0.5, 0, 0]} ref={j1} {...segmentProps}>
           <BallCollider args={[0.1]} />
         </RigidBody>
         
         {/* Joint 2 */}
-        <RigidBody position={[1, 0, 0]} ref={j2} {...segmentProps}>
+        <RigidBody position={[STRING_SEGMENT_LENGTH, 0, 0]} ref={j2} {...segmentProps}>
           <BallCollider args={[0.1]} />
         </RigidBody>
         
         {/* Joint 3 */}
-        <RigidBody position={[1.5, 0, 0]} ref={j3} {...segmentProps}>
+        <RigidBody position={[STRING_SEGMENT_LENGTH * 1.5, 0, 0]} ref={j3} {...segmentProps}>
           <BallCollider args={[0.1]} />
         </RigidBody>
         
-        {/* Light bulb rigid body */}
+        {/* Light bulb rigid body - POSITIONED USING CONSTANTS */}
         <RigidBody 
-          position={[2, 0, 0]} 
+          position={[BULB_INITIAL_X, BULB_INITIAL_Y, BULB_INITIAL_Z]} 
           ref={bulb} 
           {...segmentProps} 
           type={dragged ? 'kinematicPosition' : 'dynamic'}
@@ -241,8 +258,8 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
           {/* SECTION 11: 3D MODEL SETUP */}
           <group
             // SECTION 12: MODEL SIZING AND POSITIONING
-            scale={0.4} // Adjust this value to resize the model
-            position={[0, 1.52, 0]} // Adjust position to center the model
+            scale={0.5} // Adjust this value to resize the model
+            position={[0, 1.5, 0]} // Adjust position to center the model
             // Rotate the model 180 degrees around X-axis to flip it upside down
             rotation={[Math.PI/2,0,0]} // Use [Math.PI, 0, 0] to rotate 180° around X-axis
             
@@ -260,7 +277,6 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
               drag(new THREE.Vector3().copy(e.point).sub(vec.copy(bulb.current.translation())));
               
             }}
-            
           >
             {/* REPLACE THIS SECTION with your light bulb model parts */}
             {/* Example (you'll need to adjust based on your actual model structure): */}
@@ -282,7 +298,8 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
                     emissiveIntensity: 2 ,
                   })
                   }
-                  
+                  castShadow    // Enable shadow casting
+                  receiveShadow // Enable shadow receiving
                 />
                 </>
               );
@@ -300,14 +317,22 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
         </RigidBody>
       </group>
       
-      {/* SECTION 14: WIRE RENDERING - NOW WITH BROWN COLOR */}
+      {/* Add a ground plane to receive shadows */}
+      <mesh position={[0, -2, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[20, 20]} />
+        <meshStandardMaterial color="#f0f0f0" />
+      </mesh>
+      
+      {/* SECTION 14: WIRE RENDERING - FIXED BROWN COLOR */}
       <mesh ref={wire}>
         <meshLineGeometry />
         <meshLineMaterial
-          color={new THREE.Color(0x888888)} // Brown color for the wire (SaddleBrown)
+          color={new THREE.Color(0x8B4513)} // Brown color using THREE.Color constructor
           depthTest={false}
           resolution={isSmall ? [1000, 2000] : [1000, 1000]}
-          lineWidth={0.2} // Slightly thicker line for better visibility
+          lineWidth={1.5} // Wire thickness
+          transparent={false}
+          opacity={1}
         />
       </mesh>
     </>
