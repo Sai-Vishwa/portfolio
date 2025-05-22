@@ -2,14 +2,13 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Canvas, extend, useFrame } from '@react-three/fiber';
-import { useGLTF, useTexture, Environment, Lightformer } from '@react-three/drei';
+import { useGLTF, Environment, Lightformer } from '@react-three/drei';
 import { BallCollider, CuboidCollider, Physics, RigidBody, useRopeJoint, useSphericalJoint } from '@react-three/rapier';
 import { MeshLineGeometry, MeshLineMaterial } from 'meshline';
 
 // SECTION 1: IMPORTS
-// Import your light bulb model and any textures
+// Import your light bulb model
 import lightBulbGLB from "./light_bulb (1).glb"; // Change this to your light bulb GLB path
-import wireTexture from "./lanyard.png"; // Change this to your wire texture path
 
 import * as THREE from 'three';
 
@@ -75,11 +74,9 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
     linearDamping: 4 
   };
   
-  // SECTION 5: LOAD 3D MODEL AND TEXTURES
+  // SECTION 5: LOAD 3D MODEL
   // Load the light bulb model
   const { nodes, materials } = useGLTF(lightBulbGLB);
-  // Load the wire texture
-  const texture = useTexture(wireTexture);
   
   // Create a curve for the wire
   const [curve] = useState(() => 
@@ -99,6 +96,11 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
   const [isSmall, setIsSmall] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 1024
   );
+
+  // SECTION 5.5: DRAG CONSTRAINTS
+  // Define the maximum downward distance the bulb can be dragged
+  const MAX_DRAG_DISTANCE = 8; // Adjust this value to control how far down the bulb can be pulled
+  const fixedAnchorPosition = new THREE.Vector3(0, 4, 0); // Position of the fixed anchor
 
   // SECTION 6: PHYSICS JOINTS SETUP
   // Setup rope joints between physics bodies
@@ -130,22 +132,42 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
   // SECTION 9: ANIMATION LOOP
   // This runs every frame, updating the physics and visuals
   useFrame((state, delta) => {
-    // Handle dragging of the bulb
+    // Handle dragging of the bulb with constraints
     if (dragged) {
       // Convert screen coordinates to 3D space
       vec.set(state.pointer.x, state.pointer.y, 0.5).unproject(state.camera);
       dir.copy(vec).sub(state.camera.position).normalize();
       vec.add(dir.multiplyScalar(state.camera.position.length()));
       
+      // Calculate the target position
+      const targetPos = new THREE.Vector3(
+        vec.x - dragged.x, 
+        vec.y - dragged.y, 
+        vec.z - dragged.z
+      );
+      
+      // Apply constraints: only allow downward movement and limit distance
+      const currentBulbPos = bulb.current.translation();
+      const distanceFromAnchor = fixedAnchorPosition.distanceTo(targetPos);
+      
+      // Constrain X and Z to original position (no horizontal movement)
+      targetPos.x = currentBulbPos.x;
+      targetPos.z = currentBulbPos.z;
+      
+      // Constrain Y to only downward movement with maximum distance
+      if (targetPos.y > fixedAnchorPosition.y) {
+        // Don't allow upward movement beyond the anchor
+        targetPos.y = fixedAnchorPosition.y;
+      } else if (fixedAnchorPosition.y - targetPos.y > MAX_DRAG_DISTANCE) {
+        // Don't allow downward movement beyond the maximum distance
+        targetPos.y = fixedAnchorPosition.y - MAX_DRAG_DISTANCE;
+      }
+      
       // Wake up all physics bodies
       [bulb, j1, j2, j3, fixed].forEach((ref) => ref.current?.wakeUp());
       
-      // Move the bulb with pointer
-      bulb.current?.setNextKinematicTranslation({ 
-        x: vec.x - dragged.x, 
-        y: vec.y - dragged.y, 
-        z: vec.z - dragged.z 
-      });
+      // Move the bulb to the constrained position
+      bulb.current?.setNextKinematicTranslation(targetPos);
     }
     
     // Update wire positions and physics
@@ -173,9 +195,8 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
     }
   });
 
-  // Set curve type and texture wrapping
+  // Set curve type
   curve.curveType = 'chordal';
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
 
   return (
     <>
@@ -270,17 +291,14 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
         </RigidBody>
       </group>
       
-      {/* SECTION 14: WIRE RENDERING */}
+      {/* SECTION 14: WIRE RENDERING - NOW WITH BROWN COLOR */}
       <mesh ref={wire}>
         <meshLineGeometry />
         <meshLineMaterial
-          color="black" // Change the color of the wire
+          color="#2f1414" // Brown color for the wire (SaddleBrown)
           depthTest={false}
           resolution={isSmall ? [1000, 2000] : [1000, 1000]}
-          useMap
-          map={texture}
-          repeat={[-4, 1]}
-          lineWidth={0.8} // Adjust thickness of the wire
+          lineWidth={0.2} // Slightly thicker line for better visibility
         />
       </mesh>
     </>
