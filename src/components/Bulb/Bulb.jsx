@@ -5,11 +5,9 @@ import { Canvas, extend, useFrame } from '@react-three/fiber';
 import { useGLTF, Environment, Lightformer } from '@react-three/drei';
 import { BallCollider, CuboidCollider, Physics, RigidBody, useRopeJoint, useSphericalJoint } from '@react-three/rapier';
 import { MeshLineGeometry, MeshLineMaterial } from 'meshline';
-
 // SECTION 1: IMPORTS
 // Import your light bulb model
 import lightBulbGLB from "./light_bulb (1).glb"; // Change this to your light bulb GLB path
-
 import * as THREE from 'three';
 
 extend({ MeshLineGeometry, MeshLineMaterial });
@@ -70,8 +68,11 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
   const ang = new THREE.Vector3();
   const rot = new THREE.Vector3();
   const dir = new THREE.Vector3();
-
   const [isOn ,setIsOn] = useState(false)
+  
+  // MOBILE SUPPORT: Touch tracking state
+  const [touchId, setTouchId] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
   
   // Physics properties for segments
   const segmentProps = { 
@@ -105,6 +106,19 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
     typeof window !== 'undefined' && window.innerWidth < 1024
   );
 
+  // MOBILE DETECTION: Detect if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase()) ||
+                           ('ontouchstart' in window) ||
+                           (navigator.maxTouchPoints > 0);
+      setIsMobile(isMobileDevice);
+    };
+    
+    checkMobile();
+  }, []);
+
   // SECTION 5.5: DRAG CONSTRAINTS
   // Define the maximum downward distance the bulb can be dragged
   const MAX_DRAG_DISTANCE = 6; // Adjust this value to control how far down the bulb can be pulled
@@ -118,13 +132,13 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
   useSphericalJoint(j3, bulb, [[0, 0, 0], [0, 1.50, 0]]); // Connect j3 to the bulb
 
   // SECTION 7: CURSOR EFFECTS
-  // Change cursor on hover and drag
+  // Change cursor on hover and drag (desktop only)
   useEffect(() => {
-    if (hovered) {
+    if (!isMobile && hovered) {
       document.body.style.cursor = dragged ? 'grabbing' : 'grab';
       return () => void (document.body.style.cursor = 'auto');
     }
-  }, [hovered, dragged]);
+  }, [hovered, dragged, isMobile]);
 
   // SECTION 8: RESPONSIVE HANDLING
   // Handle window resize
@@ -132,18 +146,91 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
     const handleResize = () => {
       setIsSmall(window.innerWidth < 1024);
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // MOBILE SUPPORT: Touch event handlers
+  const handleTouchStart = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (touchId !== null) return; // Already tracking a touch
+    
+    const touch = e.touches[0];
+    setTouchId(touch.identifier);
+    
+    // Calculate the touch point in 3D space
+    const rect = e.target.getBoundingClientRect();
+    const x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    // Create a raycaster to find the 3D point
+    const raycaster = new THREE.Raycaster();
+    const camera = e.target.closest('canvas')?.__camera || e.camera;
+    if (camera) {
+      raycaster.setFromCamera({ x, y }, camera);
+      const intersects = raycaster.intersectObject(e.object, true);
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        drag(new THREE.Vector3().copy(point).sub(vec.copy(bulb.current.translation())));
+      }
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (touchId === null || !dragged) return;
+    
+    // Find the touch we're tracking
+    const touch = Array.from(e.touches).find(t => t.identifier === touchId);
+    if (!touch) return;
+    
+    // Update pointer position for the animation loop to use
+    const rect = e.target.getBoundingClientRect();
+    const x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    // Store touch coordinates for the frame loop
+    if (e.target.closest('canvas')?.__touchPointer) {
+      e.target.closest('canvas').__touchPointer = { x, y };
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // Check if our tracked touch ended
+    const endedTouch = Array.from(e.changedTouches).find(t => t.identifier === touchId);
+    if (endedTouch) {
+      setTouchId(null);
+      drag(false);
+      theme(!isOn);
+      setIsOn(!isOn);
+    }
+  };
 
   // SECTION 9: ANIMATION LOOP
   // This runs every frame, updating the physics and visuals
   useFrame((state, delta) => {
     // Handle dragging of the bulb with constraints
     if (dragged) {
+      let pointerX, pointerY;
+      
+      // Use touch coordinates if available, otherwise use mouse
+      if (isMobile && state.gl.domElement.__touchPointer) {
+        pointerX = state.gl.domElement.__touchPointer.x;
+        pointerY = state.gl.domElement.__touchPointer.y;
+      } else {
+        pointerX = state.pointer.x;
+        pointerY = state.pointer.y;
+      }
+      
       // Convert screen coordinates to 3D space
-      vec.set(state.pointer.x, state.pointer.y, 0.5).unproject(state.camera);
+      vec.set(pointerX, pointerY, 0.5).unproject(state.camera);
       dir.copy(vec).sub(state.camera.position).normalize();
       vec.add(dir.multiplyScalar(state.camera.position.length()));
       
@@ -246,21 +333,30 @@ function Wire({ maxSpeed = 50, minSpeed = 0 , theme}) {
             // Rotate the model 180 degrees around X-axis to flip it upside down
             rotation={[Math.PI/2,0,0]} // Use [Math.PI, 0, 0] to rotate 180° around X-axis
             
-            // SECTION 13: INTERACTION HANDLERS
-            onPointerOver={() => hover(true)}
-            onPointerOut={() => hover(false)}
+            // SECTION 13: INTERACTION HANDLERS - MOBILE AND DESKTOP
+            onPointerOver={() => !isMobile && hover(true)}
+            onPointerOut={() => !isMobile && hover(false)}
+            
+            // Desktop handlers
             onPointerUp={(e) => {
-              e.target.releasePointerCapture(e.pointerId);
-              drag(false);
-              theme(!isOn)
-              setIsOn(!isOn)
+              if (!isMobile) {
+                e.target.releasePointerCapture(e.pointerId);
+                drag(false);
+                theme(!isOn);
+                setIsOn(!isOn);
+              }
             }}
             onPointerDown={(e) => {
-              e.target.setPointerCapture(e.pointerId);
-              drag(new THREE.Vector3().copy(e.point).sub(vec.copy(bulb.current.translation())));
-              
+              if (!isMobile) {
+                e.target.setPointerCapture(e.pointerId);
+                drag(new THREE.Vector3().copy(e.point).sub(vec.copy(bulb.current.translation())));
+              }
             }}
             
+            // Mobile touch handlers
+            onTouchStart={isMobile ? handleTouchStart : undefined}
+            onTouchMove={isMobile ? handleTouchMove : undefined}
+            onTouchEnd={isMobile ? handleTouchEnd : undefined}
           >
             {/* REPLACE THIS SECTION with your light bulb model parts */}
             {/* Example (you'll need to adjust based on your actual model structure): */}
