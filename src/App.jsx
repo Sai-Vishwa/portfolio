@@ -15,7 +15,7 @@ function App() {
         <div className='w-3/4 flex items-center justify-start'>
 
         <p className='pl-10'> 
-          Hey inga paaru changes
+          Hey inga paaru changes nadakuthu
         </p>
 
         </div>
