@@ -14,8 +14,8 @@ function App() {
         theme={setTheme}/>
         <div className='w-3/4 flex items-center justify-start'>
 
-        <p> 
-          Hey inga paaru
+        <p className='pl-10'> 
+          Hey inga paaru changes
         </p>
 
         </div>
