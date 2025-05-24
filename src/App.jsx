@@ -9,7 +9,7 @@ function App() {
   const [theme , setTheme ] = useState(false)
 
   return (
-    <div className={`max-w-screen h-[120vh] overflow-x-hidden ${!theme?'bg-[#0a0025] ':'bg-[#ffffff] '} ${!theme?'text-[#66ff6e]':'text-[#ff0000]'}  text-6xl flex`}>
+    <div className={`max-w-screen h-[100vh] overflow-x-hidden ${!theme?'bg-[#1c1c1c] ':'bg-[#fefde9] '} ${!theme?'text-[#66ff6e]':'text-[#ff0000]'}  text-6xl flex`}>
         <LightBulb 
         theme={setTheme}/>
         <div className='w-3/4 flex items-center justify-start'>
